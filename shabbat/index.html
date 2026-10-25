@@ -219,6 +219,11 @@
   .hero span{position:absolute;inset:auto 0 0 0;padding:22px 12px 8px;background:linear-gradient(transparent,rgba(30,6,10,.82));color:#fff;font-weight:600;font-size:13px}
   .order-type-card .otc-img{width:100%;aspect-ratio:16/7;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block}
 
+  .sizes{flex:1 1 100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+  .sz{border:1px solid var(--line);border-radius:10px;padding:6px 4px;display:grid;gap:6px;justify-items:center;text-align:center;background:#fffdf8}
+  .sz.on{border-color:var(--gold);background:#fbf1ee}
+  .szl{font-size:11.5px;line-height:1.35;color:var(--ink-soft)}
+  .szl b{color:var(--ink)}
   @media print{
     body *{visibility:hidden;}
     .receipt-wrap, .receipt-wrap *{visibility:visible;}
@@ -294,7 +299,8 @@ const SIDES = [
   {id:'peppers', name:'פלפלים ממולאים (פרווה)'},
   {id:'antipasti', name:'אנטיפסטי'},
 ];
-const SIDE_GRAM_PRICE = 8; // ₪ ל-100 גרם
+const SIDE_GRAM_PRICE = 8; // ₪ ל-100 גרם (תוספת שלישית ואילך בחבילה) — הלקוח בוחר גודל כלי והמחיר מחושב מזה
+const SCHNITZEL_UNIT_GRAMS = 150; // משקל שניצל אחד
 
 const MAINS = [
   {id:'oven_chicken', name:'עוף צלוי בתנור', note:'מתאים להזמנות עד 8 סועדים', maxGuests:8},
@@ -331,31 +337,38 @@ const SALADS = [
 ];
 /* ===================== תפריט "בחירה חופשית" — מחירים לפי משקל/יחידה ===================== */
 const ALC_FIRST = [
-  {id:'salmon', name:'דג סלמון', price:22, unitType:'g100', hasVariant:true, variants:['ניחוח הדרים','שום חרדל ודבש','טריאקי']},
-  {id:'nile', name:'שיפודי נילוס פפריקה וירקות', price:18, unitType:'g100'},
-  {id:'harime', name:'חריימה מושט', price:7, unitType:'g100'},
-  {id:'fishballs', name:'קציצות דגים ברוטב אדום', price:7, unitType:'g100'},
+  {id:'salmon', name:'דג סלמון', price:40, unitType:'unit', unitLabel:'מנה', grams:180, hasVariant:true, variants:['ניחוח הדרים','שום חרדל ודבש','טריאקי']},
+  {id:'nile', name:'שיפודי נילוס פפריקה וירקות', price:35, unitType:'unit', unitLabel:'מנה', grams:200},
+  {id:'harime', name:'חריימה מושט', price:20, unitType:'unit', unitLabel:'מנה', grams:250},
+  {id:'fishballs', name:'קציצות דגים ברוטב אדום', price:15, unitType:'unit', unitLabel:'מנה', grams:200},
 ];
 
+/* תוספות: לפי גודל כלי. price100 = מחיר ל-100 גרם, density = כמה גרם נכנסים במ"ל */
+const SIDE_SIZES = [270, 500, 1000];
 const ALC_SIDES = [
-  {id:'rice', name:'אורז לבן', price:5, unitType:'g100'},
-  {id:'potato_broken', name:'תפו"א אפוי שבור', price:5, unitType:'g100'},
-  {id:'potato_rosemary', name:'רבעי תפו"א עם רוזמרין', price:5, unitType:'g100'},
-  {id:'greenbeans', name:'שעועית ירוקה מוקפצת', price:5, unitType:'g100'},
-  {id:'peas', name:'אפונה וגזר בבהרט', price:5, unitType:'g100'},
-  {id:'olives', name:'זיתים מרוקאים', price:18, unitType:'g100'},
-  {id:'peppers', name:'פלפלים ממולאים (פרווה)', price:5, unitType:'g100'},
-  {id:'antipasti', name:'אנטיפסטי', price:5, unitType:'g100'},
+  {id:'rice', name:'אורז לבן', price100:5, density:0.8},
+  {id:'potato_broken', name:'תפו"א אפוי שבור', price100:5, density:0.65},
+  {id:'potato_rosemary', name:'רבעי תפו"א עם רוזמרין', price100:5, density:0.65},
+  {id:'greenbeans', name:'שעועית ירוקה מוקפצת', price100:5, density:0.55},
+  {id:'peas', name:'אפונה וגזר בבהרט', price100:5, density:0.8},
+  {id:'olives', name:'זיתים מרוקאים', price100:18, density:0.7},
+  {id:'peppers', name:'פלפלים ממולאים (פרווה)', price:8, unitType:'unit', unitLabel:'פלפל', grams:150},
+  {id:'antipasti', name:'אנטיפסטי', price100:5, density:0.55},
 ];
+const ALC_SIDES_FLAT = ALC_SIDES.flatMap(sd=> sd.unitType ? [sd] : SIDE_SIZES.map(ml=>{
+  const grams = Math.round(ml*sd.density);
+  return {id:sd.id+'@'+ml, parent:sd.id, size:ml, name:sd.name, unitType:'unit', unitLabel:'כלי '+ml+' מ"ל', grams,
+          price: Math.max(5, Math.round(sd.price100*grams/100/5)*5)};
+}));
 
 const ALC_MAINS = [
-  {id:'oven_chicken', name:'עוף צלוי בתנור', price:15, unitType:'g100'},
-  {id:'schnitzel_cn', name:'שניצלונים בסגנון סיני', price:15, unitType:'g100'},
-  {id:'pargiot', name:'פרגיות בתנור בסגנון על האש', price:18, unitType:'g100'},
-  {id:'stirfry_cn', name:'מוקפצים סיני', price:15, unitType:'g100'},
-  {id:'beef_head', name:'בשר ראש עם חומוס', price:22, unitType:'g100'},
-  {id:'roast_beef', name:'צלי בקר', price:25, unitType:'g100'},
-  {id:'kebab', name:'קבב טורקי ברוטב אדום עם פרוסות תפו"א ועגבניה (קוואג\')', price:13, unitType:'g100'},
+  {id:'oven_chicken', name:'עוף צלוי בתנור', price:45, unitType:'unit', unitLabel:'מנה', grams:300},
+  {id:'schnitzel_cn', name:'שניצלונים בסגנון סיני', price:30, unitType:'unit', unitLabel:'מנה', grams:200},
+  {id:'pargiot', name:'פרגיות בתנור בסגנון על האש', price:45, unitType:'unit', unitLabel:'מנה', grams:250},
+  {id:'stirfry_cn', name:'מוקפצים סיני', price:40, unitType:'unit', unitLabel:'מנה', grams:250},
+  {id:'beef_head', name:'בשר ראש עם חומוס', price:45, unitType:'unit', unitLabel:'מנה', grams:200},
+  {id:'roast_beef', name:'צלי בקר', price:50, unitType:'unit', unitLabel:'מנה', grams:200},
+  {id:'kebab', name:'קבב טורקי ברוטב אדום עם פרוסות תפו"א ועגבניה (קוואג\')', price:40, unitType:'unit', unitLabel:'מנה', grams:300},
 ];
 
 const ALC_CHOLENT = [
@@ -366,15 +379,16 @@ const ALC_CHOLENT = [
   {id:'gachnun', name:'גחנון', price:15, unitType:'unit', unitLabel:'יחידה'},
   {id:'kugel_potato', name:'קוגל תפו"א', price:18, unitType:'unit', unitLabel:'יחידה'},
   {id:'kugel_jerusalem', name:'קוגל ירושלמי (כ-5 משולשים)', price:25, unitType:'unit', unitLabel:'יחידה'},
-  {id:'schnitzel_extra', name:'שניצלים', price:14, unitType:'g100'},
+  {id:'schnitzel_extra', name:'שניצלים', price:20, unitType:'unit', unitLabel:'שניצל', grams:150},
 ];
 
 const ALC_THIRD = [
-  {id:'fried_fish', name:'דגים מטוגנים (פילה)', price:6, unitType:'g100', hasVariant:true, variants:['סול','מושט']},
+  {id:'fried_fish', name:'דגים מטוגנים (פילה)', price:10, unitType:'unit', unitLabel:'מנה', grams:180, hasVariant:true, variants:['סול','מושט']},
   {id:'gefilte', name:'גפילטע פיש (שימורים, 6 קציצות)', price:25, unitType:'unit', unitLabel:'קופסה'},
   {id:'veggie_pie', name:'פשטידת ירקות', price:35, unitType:'unit', unitLabel:'תבנית (כ-8 מנות)', hasVariant:true, variants:['קישואים','ברוקולי ופטריות']},
 ];
 
+function gramsNote(g){ const T={he:`(כ-${g} גרם)`,en:`(approx. ${g}g)`,ru:`(≈${g} г)`,es:`(aprox. ${g} g)`,fr:`(env. ${g} g)`}; return T[state.lang]||T.he; }
 const ALC_CATEGORIES = [
   {key:'first', title:'מנה ראשונה', items:ALC_FIRST},
   {key:'sides', title:'תוספות', items:ALC_SIDES},
@@ -523,6 +537,12 @@ function t(heText){
 
 // מחרוזות ממשק כלליות (לא תלויות משתנים)
 const UI_T = {
+  'מנה': {en:'portion', ru:'порция', es:'porción', fr:'portion'},
+  'שניצל': {en:'schnitzel', ru:'шницель', es:'schnitzel', fr:'schnitzel'},
+  'פלפל': {en:'pepper', ru:'перец', es:'pimiento', fr:'poivron'},
+  'בחרו גודל כלי': {en:'Choose container size', ru:'Выберите размер контейнера', es:'Elija el tamaño del envase', fr:'Choisissez la taille du contenant'},
+  'בחרו מהמגוון — מחיר קבוע למנה, ותוספות לפי גודל כלי.': {en:'Choose from our selection — fixed price per portion, sides by container size.', ru:'Выбирайте — фиксированная цена за порцию, гарниры по размеру контейнера.', es:'Elija — precio fijo por porción, guarniciones según el tamaño del envase.', fr:'Faites votre choix — prix fixe par portion, accompagnements selon la taille du contenant.'},
+  'בחרו מהמגוון — מחיר קבוע למנה או ליחידה.': {en:'Choose from our selection — fixed price per portion or unit.', ru:'Выбирайте — фиксированная цена за порцию или штуку.', es:'Elija — precio fijo por porción o unidad.', fr:'Faites votre choix — prix fixe par portion ou unité.'},
   'כמעט סיימנו — פרטים ואיסוף': {en:'Almost done — your details & pickup', ru:'Почти готово — ваши данные и получение', es:'Casi listo — sus datos y la entrega', fr:'Presque fini — vos coordonnées et le retrait'},
   'המחיר לסועד נקבע לפי מספר הסועדים, והכמויות מחושבות בהתאם.': {en:'The price per guest depends on the number of guests, and quantities are calculated accordingly.', ru:'Цена за человека зависит от количества гостей, количество блюд рассчитывается соответственно.', es:'El precio por comensal depende del número de comensales y las cantidades se calculan en consecuencia.', fr:'Le prix par convive dépend du nombre de convives, et les quantités sont calculées en conséquence.'},
   'הזמנת שבת קומפלט · טבריה': {en:'Complete Shabbat Order · Tiberias', ru:'Полный заказ на Шаббат · Тверия', es:'Pedido completo de Shabat · Tiberíades', fr:'Commande complète de Chabbat · Tibériade'},
@@ -719,36 +739,32 @@ function trGuestHint(price, tooFew, tooMany){
 
 function trSidesNote(){
   const templates = {
-    he: `תוספות — 2 הראשונות כלולות. מהשלישית ואילך, תוספת לפי משקל: ${SIDE_GRAM_PRICE} ₪ ל-100 גרם.`,
-    en: `Sides — the first 2 are included. From the third one, priced by weight: ${SIDE_GRAM_PRICE} ₪ per 100g.`,
-    ru: `Гарниры — первые 2 включены. С третьего — по весу: ${SIDE_GRAM_PRICE} ₪ за 100 г.`,
-    es: `Guarniciones — las primeras 2 están incluidas. Desde la tercera, por peso: ${SIDE_GRAM_PRICE} ₪ por 100g.`,
-    fr: `Accompagnements — les 2 premiers sont inclus. À partir du 3e, au poids : ${SIDE_GRAM_PRICE} ₪ les 100g.`,
+    he: `תוספות — 2 הראשונות כלולות. מהשלישית ואילך בתוספת תשלום, לפי גודל כלי.`,
+    en: `Sides — the first 2 are included. From the third one, extra charge by container size.`,
+    ru: `Гарниры — первые 2 включены. С третьего — доплата в зависимости от размера контейнера.`,
+    es: `Guarniciones — las primeras 2 están incluidas. Desde la tercera, con cargo según el tamaño del envase.`,
+    fr: `Accompagnements — les 2 premiers sont inclus. À partir du 3e, supplément selon la taille du contenant.`,
   };
   return templates[state.lang] || templates.he;
 }
-
 function trSideGramsLabel(){
-  const templates = {
-    he: `כמות בגרמים (${SIDE_GRAM_PRICE} ₪ ל-100 גר')`,
-    en: `Amount in grams (${SIDE_GRAM_PRICE} ₪ per 100g)`,
-    ru: `Количество в граммах (${SIDE_GRAM_PRICE} ₪ за 100 г)`,
-    es: `Cantidad en gramos (${SIDE_GRAM_PRICE} ₪ por 100g)`,
-    fr: `Quantité en grammes (${SIDE_GRAM_PRICE} ₪ les 100g)`,
-  };
+  const templates = {he:'בחרו גודל כלי:', en:'Choose container size:', ru:'Выберите размер контейнера:', es:'Elija el tamaño del envase:', fr:'Choisissez la taille du contenant :'};
   return templates[state.lang] || templates.he;
 }
-
 function trSideAlert(){
   const templates = {
-    he: `שימו לב: זו תוספת שלישית ומעלה — יש עליה תוספת תשלום לפי משקל (${SIDE_GRAM_PRICE} ₪ ל-100 גרם).`,
-    en: `Note: this is your 3rd side or beyond — it's charged by weight (${SIDE_GRAM_PRICE} ₪ per 100g).`,
-    ru: `Внимание: это третий гарнир и далее — оплата по весу (${SIDE_GRAM_PRICE} ₪ за 100 г).`,
-    es: `Atención: este es el tercer acompañamiento o más — se cobra por peso (${SIDE_GRAM_PRICE} ₪ por 100g).`,
-    fr: `Attention : il s'agit du 3e accompagnement ou plus — facturé au poids (${SIDE_GRAM_PRICE} ₪ les 100g).`,
+    he:'שימו לב: זו תוספת שלישית ומעלה — בתוספת תשלום לפי גודל הכלי שתבחרו.',
+    en:'Note: this is your 3rd side or beyond — extra charge by the container size you choose.',
+    ru:'Внимание: это третий гарнир и далее — доплата в зависимости от размера контейнера.',
+    es:'Atención: este es el tercer acompañamiento o más — con cargo según el tamaño del envase.',
+    fr:'Attention : il s’agit du 3e accompagnement ou plus — supplément selon la taille du contenant.',
   };
   return templates[state.lang] || templates.he;
 }
+function sideGramsFor(id, ml){ const sd=ALC_SIDES.find(x=>x.id===id); return Math.round(ml*((sd&&sd.density)||0.7)); }
+function sideSizeLabel(id, g){ const ml=SIDE_SIZES.find(m=>sideGramsFor(id,m)===g); return ml?`${ml} ${tui('מ"ל')} ${gramsNote(g)}`:`${g} ${tui('גרם')}`; }
+function setSideSize(id, ml){ state.sidesGrams[id]=sideGramsFor(id,ml); renderStep(); }
+function changeSchnitzelCount(d){ const n=Math.max(0,Math.min(40,Math.round((state.schnitzelGrams||0)/SCHNITZEL_UNIT_GRAMS)+d)); state.schnitzelGrams=n*SCHNITZEL_UNIT_GRAMS; renderStep(); }
 
 function trSaladSubtitle(free, extraPrice){
   const templates = {
@@ -1033,7 +1049,7 @@ function alcItemRow(cat, item){
   const isCholent = cat==='cholent' && item.id==='cholent';
   const weightStep = cat==='sides' ? 250 : ((cat==='mains' || cat==='first' || cat==='third') ? 150 : 50);
   const unitLabel = isWeight ? '100 '+tui('גרם') : tui(item.unitLabel||'יחידה');
-  const priceLabel = `${item.price} ₪ / ${unitLabel}`;
+  const priceLabel = `${item.price} ₪ / ${unitLabel}${item.grams?' '+gramsNote(item.grams):''}`;
   const minusAction = isWeight
     ? (isCholent ? `changeCholentWeight(-1)` : `changeCartWeight('${cat}','${item.id}',-${weightStep})`)
     : `changeCartUnit('${cat}','${item.id}',-1)`;
@@ -1092,6 +1108,18 @@ function setCartVariant(cat, id, val){
   renderStep();
 }
 
+function alcSideGroupRow(sd){
+  if(sd.unitType) return alcItemRow('sides', sd);
+  const items = ALC_SIDES_FLAT.filter(x=>x.parent===sd.id);
+  const any = items.some(x=>(state.cart['sides:'+x.id]||0)>0);
+  return `<div class="item-row ${any?'has-qty':''}" style="flex-wrap:wrap">
+    ${thumb(sd.id)}<div class="item-info"><div class="item-name">${t(sd.name)}</div><div class="cnote">${tui('בחרו גודל כלי')}</div></div>
+    <div class="sizes">${items.map(x=>{const q=state.cart['sides:'+x.id]||0;
+      return `<div class="sz ${q>0?'on':''}"><div class="szl"><b>${x.size} ${tui('מ"ל')}</b><br>${gramsNote(x.grams)}<br><b style="color:var(--maroon)">${x.price} ₪</b></div>
+        <div class="stepper"><button onclick="changeCartUnit('sides','${x.id}',-1)">–</button><span class="qty">${q}</span><button onclick="changeCartUnit('sides','${x.id}',1)">+</button></div></div>`}).join('')}</div>
+  </div>`;
+}
+
 function alcSaladRow(idx, name, isHerring){
   const size = saladSizeMl(name);
   const key = 'salad:'+idx+':'+size;
@@ -1121,7 +1149,7 @@ function changeSaladCart(idx, size, delta){
 
 function calcALCTotal(){
   let total = 0;
-  [['first',ALC_FIRST],['sides',ALC_SIDES],['mains',ALC_MAINS],['cholent',ALC_CHOLENT],['third',ALC_THIRD]].forEach(([cat,items])=>{
+  [['first',ALC_FIRST],['sides',ALC_SIDES_FLAT],['mains',ALC_MAINS],['cholent',ALC_CHOLENT],['third',ALC_THIRD]].forEach(([cat,items])=>{
     items.forEach(item=>{
       const key = cat+':'+item.id;
       const qty = state.cart[key]||0;
@@ -1359,16 +1387,16 @@ function renderStep(){
         const selected = state.cholentAdd.includes(it.id);
         let extra='';
         if(it.extraPer100g && selected){
-          const cost = Math.round((state.schnitzelGrams/100)*it.extraPer100g);
-          extra = `<div class="weight-row" onclick="event.stopPropagation()">
-            <input type="number" min="0" max="5000" step="50" value="${state.schnitzelGrams||''}" placeholder="${tui('גרם')}"
-              oninput="setSchnitzelGrams(this.value)">
-            <span>${trWeightRowText(state.schnitzelGrams, it.extraPer100g, '<b>'+cost+'</b>')}</span>
+          const n = Math.round((state.schnitzelGrams||0)/SCHNITZEL_UNIT_GRAMS);
+          const unit = Math.round(SCHNITZEL_UNIT_GRAMS/100*it.extraPer100g);
+          extra = `<div class="weight-row" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+            <div class="stepper"><button onclick="event.stopPropagation(); changeSchnitzelCount(-1)">–</button><span class="qty">${n}</span><button onclick="event.stopPropagation(); changeSchnitzelCount(1)">+</button></div>
+            <span>× ${unit} ₪ ${gramsNote(SCHNITZEL_UNIT_GRAMS)} = <b>${n*unit}</b> ₪</span>
           </div>`;
         }
         return `<div class="choice ${selected?'selected':''}" onclick="toggleCholentAdd('${it.id}')">
           <div class="box"></div>${thumb(it.id)}
-          <div class="ctext"><div class="cname">${t(it.name)}${it.extraPer100g?` ${trPer100g(it.extraPer100g)}`:''}</div>${extra}</div>
+          <div class="ctext"><div class="cname">${t(it.name)}${it.extraPer100g?` (${Math.round(SCHNITZEL_UNIT_GRAMS/100*it.extraPer100g)} ₪ ${gramsNote(SCHNITZEL_UNIT_GRAMS)})`:''}</div>${extra}</div>
         </div>`;
       }).join('')}
     `;
@@ -1401,10 +1429,10 @@ function renderStep(){
     html = `
       <div class="step-label">${trStepLabel(state.step+1)}</div>
       <h2 class="step-title">${tui('ליל שבת')}</h2>
-      <p class="step-sub">${tui('בחרו מהמגוון — מחיר לפי משקל, מוצג באופן חי.')}</p>
+      <p class="step-sub">${tui('בחרו מהמגוון — מחיר קבוע למנה, ותוספות לפי גודל כלי.')}</p>
       ${ALC_CATEGORIES.map(cat=>`
         <h3 class="alc-cat-title">${tui(cat.title)}</h3>
-        ${cat.items.map(it=>alcItemRow(cat.key, it)).join('')}
+        ${cat.key==='sides' ? ALC_SIDES.map(alcSideGroupRow).join('') : cat.items.map(it=>alcItemRow(cat.key, it)).join('')}
       `).join('')}
     `;
   }
@@ -1423,7 +1451,7 @@ function renderStep(){
     html = `
       <div class="step-label">${trStepLabel(state.step+1)}</div>
       <h2 class="step-title">${tui('סעודה שלישית')}</h2>
-      <p class="step-sub">${tui('בחרו מהמגוון — מחיר לפי משקל או יחידה.')}</p>
+      <p class="step-sub">${tui('בחרו מהמגוון — מחיר קבוע למנה או ליחידה.')}</p>
       ${ALC_THIRD.map(it=>alcItemRow('third', it)).join('')}
     `;
   }
@@ -1502,10 +1530,9 @@ function sidesListHtml(){
       const grams = state.sidesGrams[it.id]||0;
       const cost = Math.round((grams/100)*SIDE_GRAM_PRICE);
       extraHtml = `<div class="paid-field" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()">
-        <label style="font-size:12px;color:#8a5a10;font-weight:600;display:block;margin-bottom:4px;">${trSideGramsLabel()}</label>
-        <input type="number" min="0" max="5000" step="250" value="${grams||''}" placeholder="${tui('גרם')}"
-          oninput="setSideGrams('${it.id}', this.value)" onclick="event.stopPropagation()" style="width:110px;">
-        <span id="sideCost-${it.id}" style="margin-right:8px;font-size:12.5px;color:var(--maroon);font-weight:700;">= ${cost} ₪</span>
+        <label style="font-size:12px;color:#8a5a10;font-weight:600;display:block;margin-bottom:6px;">${trSideGramsLabel()}</label>
+        <div class="sizes" style="margin-top:0">${SIDE_SIZES.map(ml=>{const g=sideGramsFor(it.id,ml);const c=Math.round((g/100)*SIDE_GRAM_PRICE);
+          return `<button type="button" class="sz ${grams===g?'on':''}" onclick="event.stopPropagation(); setSideSize('${it.id}',${ml})" style="cursor:pointer;font-family:inherit"><span class="szl"><b>${ml} ${tui('מ"ל')}</b><br>${gramsNote(g)}<br><b style="color:var(--maroon)">${c} ₪</b></span></button>`}).join('')}</div>
       </div>`;
     }
     return `<div class="choice ${selected?'selected':''}" onclick="toggleSides('${it.id}')">
@@ -1666,7 +1693,7 @@ function buildSideLines(){
     if(idx>=2){
       const grams = state.sidesGrams[id]||0;
       const cost = Math.round((grams/100)*SIDE_GRAM_PRICE);
-      return `${t(it.name)} — ${grams} ${tui('גרם')} (${tui('(תוספת בתשלום)')}, ${cost} ₪)`;
+      return `${t(it.name)} — ${sideSizeLabel(id,grams)} ${tui('(תוספת בתשלום)')} — ${cost} ₪`;
     }
     return t(it.name);
   });
@@ -1675,7 +1702,7 @@ function buildSideLines(){
 function buildCholentNames(){
   return state.cholentAdd.map(id=>{
     const it=CHOLENT_ADDONS.find(x=>x.id===id);
-    if(it.id==='schnitzel_extra') return `${t(it.name)} — ${state.schnitzelGrams} ${tui('גרם')}`;
+    if(it.id==='schnitzel_extra') return `${t(it.name)} — ${Math.round(state.schnitzelGrams/SCHNITZEL_UNIT_GRAMS)} × ${gramsNote(SCHNITZEL_UNIT_GRAMS)}`;
     return t(it.name);
   });
 }
@@ -1736,9 +1763,9 @@ function buildExtrasSummary(){
     });
   };
   addDishExtras(state.first,state.firstQty,FIRST_COURSE,FIRST_COURSE_EXTRA_FEE,tui('מנה ראשונה'));
-  state.sides.forEach((id,idx)=>{ if(idx>=2){ const it=SIDES.find(x=>x.id===id); const g=state.sidesGrams[id]||0; const c=Math.round((g/100)*SIDE_GRAM_PRICE); if(c) lines.push(`${tui('תוספות')}: ${t(it.name)} — ${g} ${tui('גרם')} — ${c} ₪`); }});
+  state.sides.forEach((id,idx)=>{ if(idx>=2){ const it=SIDES.find(x=>x.id===id); const g=state.sidesGrams[id]||0; const c=Math.round((g/100)*SIDE_GRAM_PRICE); if(c) lines.push(`${tui('תוספות')}: ${t(it.name)} — ${sideSizeLabel(id,g)} — ${c} ₪`); }});
   addDishExtras(state.mains,state.mainsQty,MAINS,MAIN_EXTRA_FEE,tui('מנה עיקרית'));
-  if(state.schnitzelGrams>0) lines.push(`${tui('שניצלים בתוספת תשלום')} — ${state.schnitzelGrams} ${tui('גרם')} — ${Math.round((state.schnitzelGrams/100)*12)} ₪`);
+  if(state.schnitzelGrams>0) lines.push(`${tui('שניצלים בתוספת תשלום')} — ${Math.round(state.schnitzelGrams/SCHNITZEL_UNIT_GRAMS)} × ${gramsNote(SCHNITZEL_UNIT_GRAMS)} — ${Math.round((state.schnitzelGrams/100)*12)} ₪`);
   const saladUnits=Object.values(state.saladsMain).reduce((a,b)=>a+b,0), free=saladsMainFree(state.guests);
   if(saladUnits>free) lines.push(`${tui('סלטים')}: ${saladUnits-free} מעבר לכלול — ${(saladUnits-free)*SALAD_EXTRA_PRICE} ₪`);
   if(state.fulfillment==='delivery') lines.push(`${tui('משלוח')} — ${DELIVERY_FEE} ₪`);
@@ -1814,7 +1841,7 @@ function buildReceiptHtml(price, rolls, bottles, eggs, orderNum, total){
 
 function buildALCCartLines(){
   const lines = {first:[], sides:[], mains:[], cholent:[], third:[], salads:[]};
-  [['first',ALC_FIRST],['sides',ALC_SIDES],['mains',ALC_MAINS],['cholent',ALC_CHOLENT],['third',ALC_THIRD]].forEach(([cat,items])=>{
+  [['first',ALC_FIRST],['sides',ALC_SIDES_FLAT],['mains',ALC_MAINS],['cholent',ALC_CHOLENT],['third',ALC_THIRD]].forEach(([cat,items])=>{
     items.forEach(item=>{
       const key = cat+':'+item.id;
       const qty = state.cart[key]||0;
@@ -1823,7 +1850,7 @@ function buildALCCartLines(){
       const cost = isWeight ? Math.round((qty/100)*item.price) : qty*item.price;
       let name = t(item.name);
       if(item.hasVariant && state.cartVariant[key]) name += ` (${t(state.cartVariant[key])})`;
-      const qtyLabel = isWeight ? `${qty} ${tui('גרם')}` : `${qty} ${tui(item.unitLabel||'יחידה')}`;
+      const qtyLabel = isWeight ? `${qty} ${tui('גרם')}` : `${qty} × ${tui(item.unitLabel||'יחידה')}${item.grams?' '+gramsNote(item.grams*qty):''}`;
       lines[cat].push({text:`${name} — ${qtyLabel}`, cost});
     });
   });
@@ -2062,11 +2089,11 @@ function syncField(key, val){
 }
 
 function saveState(){
-  try{ localStorage.setItem('kolTovOrderState2', JSON.stringify(state)); }catch(e){}
+  try{ localStorage.setItem('kolTovOrderState3', JSON.stringify(state)); }catch(e){}
 }
 function loadState(){
   try{
-    const raw = localStorage.getItem('kolTovOrderState2');
+    const raw = localStorage.getItem('kolTovOrderState3');
     if(raw){
       const saved = JSON.parse(raw);
       Object.assign(state, saved);
@@ -2078,7 +2105,7 @@ function loadState(){
   }catch(e){}
 }
 function clearSavedState(){
-  try{ localStorage.removeItem('kolTovOrderState2'); }catch(e){}
+  try{ localStorage.removeItem('kolTovOrderState3'); }catch(e){}
 }
 function startNewOrder(){
   clearSavedState();
