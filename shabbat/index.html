@@ -219,6 +219,11 @@
   .hero span{position:absolute;inset:auto 0 0 0;padding:22px 12px 8px;background:linear-gradient(transparent,rgba(30,6,10,.82));color:#fff;font-weight:600;font-size:13px}
   .order-type-card .otc-img{width:100%;aspect-ratio:16/7;object-fit:cover;border-radius:10px;margin-bottom:8px;display:block}
 
+  .quick-g{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
+  .quick-g button{min-width:52px;padding:10px 12px;border-radius:999px;border:1.5px solid var(--line);background:#fffdf8;font-family:inherit;font-weight:700;font-size:15px;color:var(--maroon);cursor:pointer}
+  .quick-g button.on{background:var(--maroon);color:var(--gold-light);border-color:var(--maroon)}
+  .order-type-card{transition:transform .12s, border-color .15s, background .15s}
+  .order-type-card:active{transform:scale(.98)}
   .sizes{flex:1 1 100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
   .sz{border:1px solid var(--line);border-radius:10px;padding:6px 4px;display:grid;gap:6px;justify-items:center;text-align:center;background:#fffdf8}
   .sz.on{border-color:var(--gold);background:#fbf1ee}
@@ -300,7 +305,8 @@ const SIDES = [
   {id:'antipasti', name:'אנטיפסטי'},
 ];
 const SIDE_GRAM_PRICE = 8; // ₪ ל-100 גרם (תוספת שלישית ואילך בחבילה) — הלקוח בוחר גודל כלי והמחיר מחושב מזה
-const SCHNITZEL_UNIT_GRAMS = 150; // משקל שניצל אחד
+const SCHNITZEL_PRICE100 = 14; // שניצלים: נמכרים לפי משקל (גודל הנתח משתנה) — אותו מחיר בכל התפריטים
+const SCHNITZEL_WEIGHTS = [300, 500, 1000];
 
 const MAINS = [
   {id:'oven_chicken', name:'עוף צלוי בתנור', note:'מתאים להזמנות עד 8 סועדים', maxGuests:8},
@@ -352,16 +358,20 @@ const ALC_SIDES = [
   {id:'greenbeans', name:'שעועית ירוקה מוקפצת', price100:5, density:0.55},
   {id:'peas', name:'אפונה וגזר בבהרט', price100:5, density:0.8},
   {id:'olives', name:'זיתים מרוקאים', price100:18, density:0.7},
-  {id:'peppers', name:'פלפלים ממולאים (פרווה)', price:8, unitType:'unit', unitLabel:'פלפל', grams:150},
+  {id:'peppers', name:'פלפלים ממולאים (פרווה)', price:17, unitType:'unit', unitLabel:'פלפל', grams:300},
   {id:'antipasti', name:'אנטיפסטי', price100:5, density:0.55},
 ];
-const ALC_SIDES_FLAT = ALC_SIDES.flatMap(sd=> sd.unitType ? [sd] : SIDE_SIZES.map(ml=>{
-  const grams = Math.round(ml*sd.density);
-  return {id:sd.id+'@'+ml, parent:sd.id, size:ml, name:sd.name, unitType:'unit', unitLabel:'כלי '+ml+' מ"ל', grams,
-          price: Math.max(5, Math.round(sd.price100*grams/100/5)*5)};
-}));
+function flatOptions(list){ return list.flatMap(sd=>{
+  if(sd.density) return SIDE_SIZES.map(ml=>{ const grams=Math.round(ml*sd.density);
+    return {id:sd.id+'@'+ml, parent:sd.id, size:ml, sizeLabel:ml+' מ"ל', showGrams:true, name:sd.name, unitType:'unit', unitLabel:'כלי '+ml+' מ"ל', grams,
+            price: Math.max(5, Math.round(sd.price100*grams/100/5)*5)}; });
+  if(sd.weights) return sd.weights.map(g=>({id:sd.id+'@'+g, parent:sd.id, size:g, sizeLabel:g+' גרם', showGrams:false, name:sd.name, unitType:'unit', unitLabel:'מגש '+g+' גרם', grams:g,
+            price: Math.round(sd.price100*g/100)}));
+  return [sd]; }); }
 
+const ALC_SIDES_FLAT = flatOptions(ALC_SIDES);
 const ALC_MAINS = [
+  {id:'schnitzel', name:'שניצלים', price100:SCHNITZEL_PRICE100, weights:SCHNITZEL_WEIGHTS},
   {id:'oven_chicken', name:'עוף צלוי בתנור', price:45, unitType:'unit', unitLabel:'מנה', grams:300},
   {id:'schnitzel_cn', name:'שניצלונים בסגנון סיני', price:30, unitType:'unit', unitLabel:'מנה', grams:200},
   {id:'pargiot', name:'פרגיות בתנור בסגנון על האש', price:45, unitType:'unit', unitLabel:'מנה', grams:250},
@@ -379,11 +389,13 @@ const ALC_CHOLENT = [
   {id:'gachnun', name:'גחנון', price:15, unitType:'unit', unitLabel:'יחידה'},
   {id:'kugel_potato', name:'קוגל תפו"א', price:18, unitType:'unit', unitLabel:'יחידה'},
   {id:'kugel_jerusalem', name:'קוגל ירושלמי (כ-5 משולשים)', price:25, unitType:'unit', unitLabel:'יחידה'},
-  {id:'schnitzel_extra', name:'שניצלים', price:20, unitType:'unit', unitLabel:'שניצל', grams:150},
+  {id:'schnitzel_extra', name:'שניצלים', price100:SCHNITZEL_PRICE100, weights:SCHNITZEL_WEIGHTS},
 ];
 
+const ALC_MAINS_FLAT = flatOptions(ALC_MAINS);
+const ALC_CHOLENT_FLAT = flatOptions(ALC_CHOLENT);
 const ALC_THIRD = [
-  {id:'fried_fish', name:'דגים מטוגנים (פילה)', price:10, unitType:'unit', unitLabel:'מנה', grams:180, hasVariant:true, variants:['סול','מושט']},
+  {id:'fried_fish', name:'דגים מטוגנים (פילה)', price:20, unitType:'unit', unitLabel:'מנה', grams:180, hasVariant:true, variants:['סול','מושט']},
   {id:'gefilte', name:'גפילטע פיש (שימורים, 6 קציצות)', price:25, unitType:'unit', unitLabel:'קופסה'},
   {id:'veggie_pie', name:'פשטידת ירקות', price:35, unitType:'unit', unitLabel:'תבנית (כ-8 מנות)', hasVariant:true, variants:['קישואים','ברוקולי ופטריות']},
 ];
@@ -537,6 +549,7 @@ function t(heText){
 
 // מחרוזות ממשק כלליות (לא תלויות משתנים)
 const UI_T = {
+  'לפי משקל — מספר השניצלים משתנה לפי גודל הנתח': {en:'By weight — the number of schnitzels varies with the cut size', ru:'По весу — количество шницелей зависит от размера куска', es:'Por peso — la cantidad de schnitzels varía según el tamaño del corte', fr:'Au poids — le nombre de schnitzels varie selon la taille des morceaux'},
   'מנה': {en:'portion', ru:'порция', es:'porción', fr:'portion'},
   'שניצל': {en:'schnitzel', ru:'шницель', es:'schnitzel', fr:'schnitzel'},
   'פלפל': {en:'pepper', ru:'перец', es:'pimiento', fr:'poivron'},
@@ -761,10 +774,16 @@ function trSideAlert(){
   };
   return templates[state.lang] || templates.he;
 }
-function sideGramsFor(id, ml){ const sd=ALC_SIDES.find(x=>x.id===id); return Math.round(ml*((sd&&sd.density)||0.7)); }
-function sideSizeLabel(id, g){ const ml=SIDE_SIZES.find(m=>sideGramsFor(id,m)===g); return ml?`${ml} ${tui('מ"ל')} ${gramsNote(g)}`:`${g} ${tui('גרם')}`; }
-function setSideSize(id, ml){ state.sidesGrams[id]=sideGramsFor(id,ml); renderStep(); }
-function changeSchnitzelCount(d){ const n=Math.max(0,Math.min(40,Math.round((state.schnitzelGrams||0)/SCHNITZEL_UNIT_GRAMS)+d)); state.schnitzelGrams=n*SCHNITZEL_UNIT_GRAMS; renderStep(); }
+function extraOpts(id){
+  const sd=ALC_SIDES.find(x=>x.id===id);
+  if(sd && sd.unitType) return [1,2,4].map(n=>({label:`${n} × ${tui(sd.unitLabel)}`, grams:n*sd.grams, price:n*sd.price, showGrams:true}));
+  return ALC_SIDES_FLAT.filter(x=>x.parent===id).map(x=>({label:`${x.size} ${tui('מ"ל')}`, grams:x.grams, price:x.price, showGrams:true}));
+}
+function extraSideCost(id,g){ const o=extraOpts(id).find(o=>o.grams===g); return o?o.price:Math.round((g/100)*SIDE_GRAM_PRICE); }
+function sideSizeLabel(id, g){ const o=extraOpts(id).find(o=>o.grams===g); return o?`${o.label} ${gramsNote(g)}`:`${g} ${tui('גרם')}`; }
+function setSideSize(id, g){ state.sidesGrams[id]=g; renderStep(); }
+function schnitzelCost(){ return Math.round((state.schnitzelGrams||0)/100*SCHNITZEL_PRICE100); }
+function setSchnitzelWeight(g){ state.schnitzelGrams = state.schnitzelGrams===g ? 0 : g; renderStep(); }
 
 function trSaladSubtitle(free, extraPrice){
   const templates = {
@@ -862,12 +881,12 @@ function calcTotal(){
   state.sides.forEach((id,idx)=>{
     if(idx>=2){
       const grams = state.sidesGrams[id]||0;
-      sidesCost += (grams/100)*SIDE_GRAM_PRICE;
+      sidesCost += extraSideCost(id, grams);
     }
   });
   total += sidesCost;
 
-  total += (state.schnitzelGrams/100)*12;
+  total += schnitzelCost();
 
   const saladMainUnits = Object.values(state.saladsMain).reduce((a,b)=>a+b,0);
   const freeMain = saladsMainFree(state.guests);
@@ -1031,7 +1050,8 @@ function onGuestsInput(val){
   saveState();
 }
 
-function setOrderType(val){ state.orderType=val; renderStep(); }
+function pickGuests(n){ state.guests=n; renderStep(); setTimeout(()=>{ if(SK()==='guests') goNext(); }, 350); }
+function setOrderType(val){ state.orderType=val; renderStep(); setTimeout(()=>{ if(SK()==='type') goNext(); }, 280); }
 
 function alcItemRow(cat, item){
   const key = cat+':'+item.id;
@@ -1108,15 +1128,16 @@ function setCartVariant(cat, id, val){
   renderStep();
 }
 
-function alcSideGroupRow(sd){
-  if(sd.unitType) return alcItemRow('sides', sd);
-  const items = ALC_SIDES_FLAT.filter(x=>x.parent===sd.id);
-  const any = items.some(x=>(state.cart['sides:'+x.id]||0)>0);
+function alcGroupRow(cat, sd, flat){
+  if(!sd.density && !sd.weights) return alcItemRow(cat, sd);
+  const items = flat.filter(x=>x.parent===sd.id);
+  const any = items.some(x=>(state.cart[cat+':'+x.id]||0)>0);
+  const hint = sd.weights ? tui('לפי משקל — מספר השניצלים משתנה לפי גודל הנתח') : tui('בחרו גודל כלי');
   return `<div class="item-row ${any?'has-qty':''}" style="flex-wrap:wrap">
-    ${thumb(sd.id)}<div class="item-info"><div class="item-name">${t(sd.name)}</div><div class="cnote">${tui('בחרו גודל כלי')}</div></div>
-    <div class="sizes">${items.map(x=>{const q=state.cart['sides:'+x.id]||0;
-      return `<div class="sz ${q>0?'on':''}"><div class="szl"><b>${x.size} ${tui('מ"ל')}</b><br>${gramsNote(x.grams)}<br><b style="color:var(--maroon)">${x.price} ₪</b></div>
-        <div class="stepper"><button onclick="changeCartUnit('sides','${x.id}',-1)">–</button><span class="qty">${q}</span><button onclick="changeCartUnit('sides','${x.id}',1)">+</button></div></div>`}).join('')}</div>
+    ${thumb(sd.id)}<div class="item-info"><div class="item-name">${t(sd.name)}</div><div class="cnote">${hint}</div></div>
+    <div class="sizes">${items.map(x=>{const q=state.cart[cat+':'+x.id]||0;
+      return `<div class="sz ${q>0?'on':''}"><div class="szl"><b>${x.showGrams?x.size+' '+tui('מ"ל'):x.size+' '+tui('גרם')}</b><br>${x.showGrams?gramsNote(x.grams):'&nbsp;'}<br><b style="color:var(--maroon)">${x.price} ₪</b></div>
+        <div class="stepper"><button onclick="changeCartUnit('${cat}','${x.id}',-1)">–</button><span class="qty">${q}</span><button onclick="changeCartUnit('${cat}','${x.id}',1)">+</button></div></div>`}).join('')}</div>
   </div>`;
 }
 
@@ -1149,7 +1170,7 @@ function changeSaladCart(idx, size, delta){
 
 function calcALCTotal(){
   let total = 0;
-  [['first',ALC_FIRST],['sides',ALC_SIDES_FLAT],['mains',ALC_MAINS],['cholent',ALC_CHOLENT],['third',ALC_THIRD]].forEach(([cat,items])=>{
+  [['first',ALC_FIRST],['sides',ALC_SIDES_FLAT],['mains',ALC_MAINS_FLAT],['cholent',ALC_CHOLENT_FLAT],['third',ALC_THIRD]].forEach(([cat,items])=>{
     items.forEach(item=>{
       const key = cat+':'+item.id;
       const qty = state.cart[key]||0;
@@ -1338,6 +1359,7 @@ function renderStep(){
       <h2 class="step-title">${tui('כמה סועדים אתם?')}</h2>
       <p class="step-sub">${tui('המחיר לסועד נקבע לפי מספר הסועדים, והכמויות מחושבות בהתאם.')}</p>
       <input type="number" inputmode="numeric" id="fGuests" min="4" max="120" value="${state.guests??''}" placeholder="${tui('לדוגמה: 10')}" oninput="onGuestsInput(this.value)" style="font-size:22px;text-align:center;font-weight:700">
+      <div class="quick-g">${[4,6,8,10,12,15,20,25,30].map(n=>`<button type="button" class="${state.guests===n?'on':''}" onclick="pickGuests(${n})">${n}</button>`).join('')}</div>
       <div id="guestHintArea">${trGuestHint(price, tooFew, tooMany)}</div>
     `;
   }
@@ -1387,16 +1409,14 @@ function renderStep(){
         const selected = state.cholentAdd.includes(it.id);
         let extra='';
         if(it.extraPer100g && selected){
-          const n = Math.round((state.schnitzelGrams||0)/SCHNITZEL_UNIT_GRAMS);
-          const unit = Math.round(SCHNITZEL_UNIT_GRAMS/100*it.extraPer100g);
-          extra = `<div class="weight-row" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()">
-            <div class="stepper"><button onclick="event.stopPropagation(); changeSchnitzelCount(-1)">–</button><span class="qty">${n}</span><button onclick="event.stopPropagation(); changeSchnitzelCount(1)">+</button></div>
-            <span>× ${unit} ₪ ${gramsNote(SCHNITZEL_UNIT_GRAMS)} = <b>${n*unit}</b> ₪</span>
+          extra = `<div class="paid-field" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+            <div class="sizes" style="margin-top:0">${SCHNITZEL_WEIGHTS.map(g=>`<button type="button" class="sz ${state.schnitzelGrams===g?'on':''}" onclick="event.stopPropagation(); setSchnitzelWeight(${g})" style="cursor:pointer;font-family:inherit"><span class="szl"><b>${g} ${tui('גרם')}</b><br><b style="color:var(--maroon)">${Math.round(g/100*SCHNITZEL_PRICE100)} ₪</b></span></button>`).join('')}</div>
+            <div class="cnote" style="margin-top:6px">${tui('לפי משקל — מספר השניצלים משתנה לפי גודל הנתח')}</div>
           </div>`;
         }
         return `<div class="choice ${selected?'selected':''}" onclick="toggleCholentAdd('${it.id}')">
           <div class="box"></div>${thumb(it.id)}
-          <div class="ctext"><div class="cname">${t(it.name)}${it.extraPer100g?` (${Math.round(SCHNITZEL_UNIT_GRAMS/100*it.extraPer100g)} ₪ ${gramsNote(SCHNITZEL_UNIT_GRAMS)})`:''}</div>${extra}</div>
+          <div class="ctext"><div class="cname">${t(it.name)}</div>${extra}</div>
         </div>`;
       }).join('')}
     `;
@@ -1432,7 +1452,7 @@ function renderStep(){
       <p class="step-sub">${tui('בחרו מהמגוון — מחיר קבוע למנה, ותוספות לפי גודל כלי.')}</p>
       ${ALC_CATEGORIES.map(cat=>`
         <h3 class="alc-cat-title">${tui(cat.title)}</h3>
-        ${cat.key==='sides' ? ALC_SIDES.map(alcSideGroupRow).join('') : cat.items.map(it=>alcItemRow(cat.key, it)).join('')}
+        ${cat.items.map(it=>alcGroupRow(cat.key, it, cat.key==='sides'?ALC_SIDES_FLAT:ALC_MAINS_FLAT)).join('')}
       `).join('')}
     `;
   }
@@ -1443,7 +1463,7 @@ function renderStep(){
       <h2 class="step-title">${tui('חמין ותוספותיו')}</h2>
       ${hero('cholent')}
       <p class="step-sub">${tui('שבת בבוקר — לפי משקל או יחידה.')}</p>
-      ${ALC_CHOLENT.map(it=>alcItemRow('cholent', it)).join('')}
+      ${ALC_CHOLENT.map(it=>alcGroupRow('cholent', it, ALC_CHOLENT_FLAT)).join('')}
     `;
   }
 
@@ -1528,11 +1548,10 @@ function sidesListHtml(){
     let extraHtml = '';
     if(isExtra){
       const grams = state.sidesGrams[it.id]||0;
-      const cost = Math.round((grams/100)*SIDE_GRAM_PRICE);
       extraHtml = `<div class="paid-field" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation()">
         <label style="font-size:12px;color:#8a5a10;font-weight:600;display:block;margin-bottom:6px;">${trSideGramsLabel()}</label>
-        <div class="sizes" style="margin-top:0">${SIDE_SIZES.map(ml=>{const g=sideGramsFor(it.id,ml);const c=Math.round((g/100)*SIDE_GRAM_PRICE);
-          return `<button type="button" class="sz ${grams===g?'on':''}" onclick="event.stopPropagation(); setSideSize('${it.id}',${ml})" style="cursor:pointer;font-family:inherit"><span class="szl"><b>${ml} ${tui('מ"ל')}</b><br>${gramsNote(g)}<br><b style="color:var(--maroon)">${c} ₪</b></span></button>`}).join('')}</div>
+        <div class="sizes" style="margin-top:0">${extraOpts(it.id).map(o=>
+          `<button type="button" class="sz ${grams===o.grams?'on':''}" onclick="event.stopPropagation(); setSideSize('${it.id}',${o.grams})" style="cursor:pointer;font-family:inherit"><span class="szl"><b>${o.label}</b><br>${gramsNote(o.grams)}<br><b style="color:var(--maroon)">${o.price} ₪</b></span></button>`).join('')}</div>
       </div>`;
     }
     return `<div class="choice ${selected?'selected':''}" onclick="toggleSides('${it.id}')">
@@ -1589,7 +1608,7 @@ function toggleCholentAdd(id){
   if(!state.cholentAdd.includes('schnitzel_extra')) state.schnitzelGrams=0;
   renderStep();
 }
-function setSchnitzelGrams(v){ let n=parseFloat(v)||0; if(n<0)n=0; if(n>5000)n=5000; state.schnitzelGrams=n; renderTotalBar(); const el=document.querySelector('.weight-row b'); if(el) el.textContent = Math.round((state.schnitzelGrams/100)*12)+' ₪'; }
+function setSchnitzelGrams(v){ let n=parseFloat(v)||0; if(n<0)n=0; if(n>5000)n=5000; state.schnitzelGrams=n; renderTotalBar(); const el=document.querySelector('.weight-row b'); if(el) el.textContent = schnitzelCost()+' ₪'; }
 
 function setThird(id){
   state.third=id;
@@ -1692,7 +1711,7 @@ function buildSideLines(){
     const it = SIDES.find(x=>x.id===id);
     if(idx>=2){
       const grams = state.sidesGrams[id]||0;
-      const cost = Math.round((grams/100)*SIDE_GRAM_PRICE);
+      const cost = extraSideCost(id, grams);
       return `${t(it.name)} — ${sideSizeLabel(id,grams)} ${tui('(תוספת בתשלום)')} — ${cost} ₪`;
     }
     return t(it.name);
@@ -1702,7 +1721,7 @@ function buildSideLines(){
 function buildCholentNames(){
   return state.cholentAdd.map(id=>{
     const it=CHOLENT_ADDONS.find(x=>x.id===id);
-    if(it.id==='schnitzel_extra') return `${t(it.name)} — ${Math.round(state.schnitzelGrams/SCHNITZEL_UNIT_GRAMS)} × ${gramsNote(SCHNITZEL_UNIT_GRAMS)}`;
+    if(it.id==='schnitzel_extra') return `${t(it.name)} — ${state.schnitzelGrams} ${tui('גרם')} (${schnitzelCost()} ₪)`;
     return t(it.name);
   });
 }
@@ -1763,9 +1782,9 @@ function buildExtrasSummary(){
     });
   };
   addDishExtras(state.first,state.firstQty,FIRST_COURSE,FIRST_COURSE_EXTRA_FEE,tui('מנה ראשונה'));
-  state.sides.forEach((id,idx)=>{ if(idx>=2){ const it=SIDES.find(x=>x.id===id); const g=state.sidesGrams[id]||0; const c=Math.round((g/100)*SIDE_GRAM_PRICE); if(c) lines.push(`${tui('תוספות')}: ${t(it.name)} — ${sideSizeLabel(id,g)} — ${c} ₪`); }});
+  state.sides.forEach((id,idx)=>{ if(idx>=2){ const it=SIDES.find(x=>x.id===id); const g=state.sidesGrams[id]||0; const c=extraSideCost(id,g); if(c) lines.push(`${tui('תוספות')}: ${t(it.name)} — ${sideSizeLabel(id,g)} — ${c} ₪`); }});
   addDishExtras(state.mains,state.mainsQty,MAINS,MAIN_EXTRA_FEE,tui('מנה עיקרית'));
-  if(state.schnitzelGrams>0) lines.push(`${tui('שניצלים בתוספת תשלום')} — ${Math.round(state.schnitzelGrams/SCHNITZEL_UNIT_GRAMS)} × ${gramsNote(SCHNITZEL_UNIT_GRAMS)} — ${Math.round((state.schnitzelGrams/100)*12)} ₪`);
+  if(state.schnitzelGrams>0) lines.push(`${tui('שניצלים בתוספת תשלום')} — ${state.schnitzelGrams} ${tui('גרם')} — ${schnitzelCost()} ₪`);
   const saladUnits=Object.values(state.saladsMain).reduce((a,b)=>a+b,0), free=saladsMainFree(state.guests);
   if(saladUnits>free) lines.push(`${tui('סלטים')}: ${saladUnits-free} מעבר לכלול — ${(saladUnits-free)*SALAD_EXTRA_PRICE} ₪`);
   if(state.fulfillment==='delivery') lines.push(`${tui('משלוח')} — ${DELIVERY_FEE} ₪`);
@@ -1841,7 +1860,7 @@ function buildReceiptHtml(price, rolls, bottles, eggs, orderNum, total){
 
 function buildALCCartLines(){
   const lines = {first:[], sides:[], mains:[], cholent:[], third:[], salads:[]};
-  [['first',ALC_FIRST],['sides',ALC_SIDES_FLAT],['mains',ALC_MAINS],['cholent',ALC_CHOLENT],['third',ALC_THIRD]].forEach(([cat,items])=>{
+  [['first',ALC_FIRST],['sides',ALC_SIDES_FLAT],['mains',ALC_MAINS_FLAT],['cholent',ALC_CHOLENT_FLAT],['third',ALC_THIRD]].forEach(([cat,items])=>{
     items.forEach(item=>{
       const key = cat+':'+item.id;
       const qty = state.cart[key]||0;
@@ -1850,7 +1869,7 @@ function buildALCCartLines(){
       const cost = isWeight ? Math.round((qty/100)*item.price) : qty*item.price;
       let name = t(item.name);
       if(item.hasVariant && state.cartVariant[key]) name += ` (${t(state.cartVariant[key])})`;
-      const qtyLabel = isWeight ? `${qty} ${tui('גרם')}` : `${qty} × ${tui(item.unitLabel||'יחידה')}${item.grams?' '+gramsNote(item.grams*qty):''}`;
+      const qtyLabel = isWeight ? `${qty} ${tui('גרם')}` : `${qty} × ${tui(item.unitLabel||'יחידה')}${item.grams&&item.showGrams!==false?' '+gramsNote(item.grams*qty):''}`;
       lines[cat].push({text:`${name} — ${qtyLabel}`, cost});
     });
   });
