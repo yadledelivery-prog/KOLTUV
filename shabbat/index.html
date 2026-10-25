@@ -240,10 +240,21 @@
   .traysheet .ln{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
   .tag{display:inline-block;font-size:10.5px;font-weight:700;border-radius:20px;padding:1px 7px;margin-inline-start:6px;vertical-align:2px}
   .tag.spicy{background:#fde3dc;color:#a02a14}.tag.top{background:var(--gold);color:#3a2c0c}.tag.rec{background:#e8f0e3;color:#2f5a1f}
-  .swipe{display:grid;grid-auto-flow:column;grid-template-rows:repeat(2,auto);grid-auto-columns:47%;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+  .swipe-wrap{position:relative;margin:0 -6px}
+  .swipe-wrap::after{content:"";position:absolute;top:0;bottom:6px;left:0;width:34px;background:linear-gradient(90deg,#fffdf8,rgba(255,253,248,0));pointer-events:none;transition:opacity .2s}
+  .swipe-wrap.end::after{opacity:0}
+  .sw-btn{position:absolute;top:50%;transform:translateY(-60%);z-index:2;width:38px;height:38px;border-radius:50%;border:none;background:var(--maroon);color:var(--gold-light);font-size:20px;font-weight:700;box-shadow:0 3px 10px rgba(20,8,8,.3);cursor:pointer;display:grid;place-items:center;transition:opacity .2s}
+  .sw-btn.next{left:2px;animation:nudge 1.4s ease-in-out 3}
+  .sw-btn.prev{right:2px}
+  .sw-btn[disabled]{opacity:0;pointer-events:none}
+  @keyframes nudge{0%,100%{transform:translate(0,-60%)}50%{transform:translate(-6px,-60%)}}
+  .sw-dots{display:flex;gap:5px;justify-content:center;margin:6px 0 2px}
+  .sw-dots i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
+  .sw-dots i.on{background:var(--maroon);width:18px;border-radius:4px}
+  .swipe-hint{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--maroon);margin:2px 0 8px}
+  .swipe{display:grid;grid-auto-flow:column;grid-template-rows:repeat(2,auto);grid-auto-columns:41%;scroll-behavior:smooth;padding-inline:6px;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;-webkit-overflow-scrolling:touch}
   .swipe .item-row{scroll-snap-align:start;flex-direction:column;align-items:stretch;flex-wrap:nowrap;border:1.5px solid var(--line)!important;border-radius:12px;padding:10px;text-align:center;gap:8px;min-height:104px}
   .swipe .item-row .stepper{justify-content:center}
-  .swipe-hint{font-size:12px;color:var(--ink-soft);margin:-4px 0 6px}
   .celebrate{position:fixed;inset:0;z-index:50;background:radial-gradient(circle at 50% 40%,rgba(75,16,21,.92),rgba(30,6,10,.97));display:grid;place-items:center;text-align:center;color:var(--gold-light);animation:fadein .3s}
   .celebrate[hidden]{display:none}
   .celebrate .candles{display:flex;gap:46px;justify-content:center;margin-bottom:18px}
@@ -593,6 +604,7 @@ function t(heText){
 
 // מחרוזות ממשק כלליות (לא תלויות משתנים)
 const UI_T = {
+  'סלטים — החליקו שמאלה או לחצו על החץ': {en:'salads — swipe or tap the arrow', ru:'салатов — листайте или нажмите на стрелку', es:'ensaladas — deslice o toque la flecha', fr:'salades — faites glisser ou touchez la flèche'},
   'החליקו הצידה לעוד סלטים ←': {en:'Swipe sideways for more salads →', ru:'Листайте в сторону — ещё салаты →', es:'Deslice para ver más ensaladas →', fr:'Faites glisser pour plus de salades →'},
   'לפי משקל — מספר השניצלים משתנה לפי גודל הנתח': {en:'By weight — the number of schnitzels varies with the cut size', ru:'По весу — количество шницелей зависит от размера куска', es:'Por peso — la cantidad de schnitzels varía según el tamaño del corte', fr:'Au poids — le nombre de schnitzels varie selon la taille des morceaux'},
   'מנה': {en:'portion', ru:'порция', es:'porción', fr:'portion'},
@@ -1052,6 +1064,25 @@ function celebrate(){
   setTimeout(()=>{ c.hidden=true; },4500);
 }
 
+/* ===== סלטים בהחלקה: חצים, נקודות והדגמה ראשונה ===== */
+let _swipePos={};
+function swipeBy(btn,dir){ const sw=btn.parentElement.querySelector('.swipe'); sw.scrollBy({left:dir*sw.clientWidth*0.85}); }
+function initSwipes(){
+  document.querySelectorAll('.swipe').forEach((sw,i)=>{
+    const wrap=sw.parentElement, dots=wrap.nextElementSibling;
+    const key=SK()+i;
+    if(_swipePos[key]!=null){ sw.style.scrollBehavior='auto'; sw.scrollLeft=_swipePos[key]; sw.style.scrollBehavior=''; }
+    const upd=()=>{ const max=sw.scrollWidth-sw.clientWidth, pos=Math.abs(sw.scrollLeft); _swipePos[key]=sw.scrollLeft;
+      wrap.querySelector('.prev').disabled=pos<8; wrap.querySelector('.next').disabled=pos>max-8; wrap.classList.toggle('end',pos>max-8);
+      if(dots){ const pages=Math.max(1,Math.ceil(sw.scrollWidth/sw.clientWidth-0.05)), cur=Math.min(pages-1,Math.round(pos/sw.clientWidth));
+        dots.innerHTML=Array.from({length:pages},(_,j)=>`<i class="${j===cur?'on':''}"></i>`).join(''); } };
+    sw.addEventListener('scroll',upd,{passive:true}); upd();
+    // הדגמה: בפעם הראשונה הרשימה "זזה" קצת כדי להראות שאפשר להחליק
+    if(_swipePos[key+'_demo']==null){ _swipePos[key+'_demo']=1;
+      setTimeout(()=>{ sw.scrollBy({left:-70}); setTimeout(()=>sw.scrollBy({left:70}),650); },500); }
+  });
+}
+
 function renderProgress(){
   progressEl.innerHTML='';
   for(let i=0;i<totalSteps();i++){
@@ -1421,7 +1452,7 @@ function renderStep(){
   }
   if(totalbarEl) totalbarEl.style.display='flex';
   renderProgress();
-  setTimeout(()=>{ renderMeter(); renderTray(); },0);
+  setTimeout(()=>{ renderMeter(); renderTray(); initSwipes(); },0);
   let html='';
 
   if(SK()==='details'){
@@ -1608,8 +1639,9 @@ function renderStep(){
       <h2 class="step-title">${tui('מגוון הסלטים שלנו')}</h2>
       ${hero('salads2')}
       <p class="step-sub">${tui('הסלטים מוצגים בגודל האריזה המתאים להם: 140 מ"ל או 270 מ"ל.')}</p>
-      <div class="swipe-hint">${tui('החליקו הצידה לעוד סלטים ←')}</div>
-      <div class="swipe">${ALC_SALADS.map((name,idx)=>alcSaladRow(idx, name, name===HERRING_NAME)).join('')}</div>
+      <div class="swipe-hint">👈 ${ALC_SALADS.length} ${tui('סלטים — החליקו שמאלה או לחצו על החץ')}</div>
+      <div class="swipe-wrap"><button type="button" class="sw-btn prev" aria-label="הקודם" onclick="swipeBy(this,1)">›</button><button type="button" class="sw-btn next" aria-label="הבא" onclick="swipeBy(this,-1)">‹</button>
+      <div class="swipe">${ALC_SALADS.map((name,idx)=>alcSaladRow(idx, name, name===HERRING_NAME)).join('')}</div></div><div class="sw-dots"></div>
       <label class="field">${tui('הערות מיוחדות (אופציונלי)')}</label>
       <textarea id="fNotes" placeholder="${tui('לדוגמה: רגישויות, בקשות מיוחדות')}" oninput="syncField('notes', this.value)">${state.notes}</textarea>
     `;
@@ -1649,7 +1681,8 @@ function renderSaladPicker(cfg){
       <div class="price-hint">${tui('בסדר, תוכלו לבחור מגוון סלטים בעת האיסוף מהחנות.')}</div>
     ` : `
       <div class="selcount">${trSaladCount(total, cfg.freeUnits, extraUnits, extraUnits*(cfg.extraPrice||0))}</div>
-      <div class="swipe-hint">${tui('החליקו הצידה לעוד סלטים ←')}</div>
+      <div class="swipe-hint">👈 ${SALADS.length} ${tui('סלטים — החליקו שמאלה או לחצו על החץ')}</div>
+      <div class="swipe-wrap"><button type="button" class="sw-btn prev" aria-label="הקודם" onclick="swipeBy(this,1)">›</button><button type="button" class="sw-btn next" aria-label="הבא" onclick="swipeBy(this,-1)">‹</button>
       <div class="swipe">${SALADS.map((s,idx)=>{
         const id='s'+idx;
         const qty = qtyMap[id]||0;
@@ -1662,7 +1695,7 @@ function renderSaladPicker(cfg){
             <button onclick="changeSaladQty('${cfg.arrField}','${id}',1)" ${blockPlus?'style="opacity:.4;pointer-events:none;"':''}>+</button>
           </div>
         </div>`;
-      }).join('')}</div>
+      }).join('')}</div></div><div class="sw-dots"></div>
     `}
     ${cfg.note?`<div class="price-hint">${cfg.note}</div>`:''}
   `;
